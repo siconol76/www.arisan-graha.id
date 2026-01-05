@@ -88,10 +88,18 @@
         .no-print {
           display: none !important;
         }
+        body {
+          margin: 25mm 20mm; /* atas-bawah | kiri-kanan */
+        }
         .print-header,
         .ttd-area {
           display: flex !important;
         }
+      }
+      .print-wrapper {
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 10mm;
       }
     </style>
   </head>
@@ -132,7 +140,7 @@
 
     <header>
       <div style="display: flex; align-items: center; gap: 15px">
-        <img src="logo.png" style="height: 60px" />
+        <img src="./img/logo.png" style="height: 60px" />
         <div>
           <h1>ARISAN SEMETON GRAHA TIRTA</h1>
           <small>Laporan Kas Masuk & Keluar</small>
@@ -140,7 +148,6 @@
       </div>
       <div class="menu no-print">
         <span id="userInfo"></span>
-        <button id="adminMenuBtn" style="display: none">Data Anggota</button>
         <button onclick="logout()">Logout</button>
       </div>
     </header>
@@ -183,37 +190,33 @@
     <div class="no-print">
       <button onclick="tambahKas()">➕ Tambah</button>
       <button onclick="simpanSemua()">💾 Simpan Semua</button>
-      <button onclick="window.print()">🖨️ Export PDF</button>
-    </div>
-
-    <!-- PRINT HEADER -->
-    <div
-      class="print-header"
-      style="align-items: center; gap: 15px; margin-top: 40px"
-    >
-      <img src="logo.png" style="height: 70px" />
-      <div>
-        <h2>ARISAN SEMETON GRAHA TIRTA</h2>
-        <small>Laporan Kas</small>
-      </div>
+      <button onclick="printBulanan()">📄 PDF Bulanan</button>
+      <button onclick="printTahunan()">📄 PDF Tahunan</button>
+      <button onclick="lockBulan()" class="danger">🔒 Tutup Bulan</button>
     </div>
 
     <!-- TTD DIGITAL -->
-    <div
-      class="ttd-area"
-      style="justify-content: space-between; margin-top: 60px"
-    >
-      <div style="text-align: center">
-        <div>Ketua</div>
-        <br />
-        <img id="ttdKetuaImg" style="height: 80px" /><br />
-        <strong id="ttdKetuaText"></strong>
-      </div>
-      <div style="text-align: center">
-        <div>Bendahara</div>
-        <br />
-        <img id="ttdBendaharaImg" style="height: 80px" /><br />
-        <strong id="ttdBendaharaText"></strong>
+    <div class="print-wrapper">
+      <div class="ttd-area">
+        <div style="text-align: center">
+          <div>Ketua</div>
+          <br />
+          <img src="./img/logo.png" style="height: 80px" /><br />
+          <strong> PUTU YOGI ANDRIAS </strong>
+        </div>
+
+        <div style="text-align: center">
+          <div>Bendahara</div>
+          <br />
+          <img src="./img/logo.png" style="height: 80px" /><br />
+          <strong> KETUT AGUS SINARTA </strong>
+        </div>
+        <div style="text-align: center">
+          <div>Skretaris</div>
+          <br />
+          <img src="./img/logo.png" style="height: 80px" /><br />
+          <strong>Agus Oky Suryawan</strong>
+        </div>
       </div>
     </div>
 
@@ -260,6 +263,7 @@
       // ===== DATA =====
       let kasData = [];
       const akunMap = { 101: "Kas Arisan", 102: "Kas Kecil", 103: "Suka Duka" };
+      let lockedMonths = {};
 
       const saved = localStorage.getItem("currentUser");
       if (saved) {
@@ -270,24 +274,20 @@
 
       function init() {
         userInfo.innerText = currentUser.user + " (" + currentUser.role + ")";
-
-        // MENU ADMIN HANYA UNTUK ADMIN
-        if (currentUser.role === "admin") {
-          adminMenuBtn.style.display = "inline-block";
-          if (typeof loadAnggota === "function") loadAnggota();
-        } else {
-          adminMenuBtn.style.display = "none";
-        }
-
+        db.ref("lockedMonths").on(
+          "value",
+          (s) => (lockedMonths = s.val() || {})
+        );
         db.ref("kasData").on("value", (s) => {
           kasData = s.val() || [];
           renderKas();
         });
       }
 
-      // ===== KAS =====
       function tambahKas() {
-        if (!canEdit()) return;
+        if (!canEdit()) return alert("Tidak punya akses");
+        const m = new Date().toISOString().slice(0, 7);
+        if (lockedMonths[m]) return alert("Bulan sudah dikunci");
         kasData.push({
           tanggal: new Date().toISOString().slice(0, 10),
           kode: 101,
@@ -297,8 +297,9 @@
         });
         renderKas();
       }
+
       function simpanSemua() {
-        if (!canEdit()) return;
+        if (!canEdit()) return alert("Tidak punya akses");
         db.ref("kasData")
           .set(kasData)
           .then(() => alert("Tersimpan"));
@@ -314,13 +315,11 @@
       <td><input type="date" ${dis} value="${
             k.tanggal
           }" onchange="kasData[${i}].tanggal=this.value"></td>
-      <td>
-        <select ${dis} onchange="kasData[${i}].kode=Number(this.value); renderKas();">
-          <option value="101" ${k.kode == 101 ? "selected" : ""}>101</option>
-          <option value="102" ${k.kode == 102 ? "selected" : ""}>102</option>
-          <option value="103" ${k.kode == 103 ? "selected" : ""}>103</option>
-        </select>
-      </td>
+      <td><select ${dis} onchange="kasData[${i}].kode=Number(this.value);renderKas()">
+        <option value="101" ${k.kode == 101 ? "selected" : ""}>101</option>
+        <option value="102" ${k.kode == 102 ? "selected" : ""}>102</option>
+        <option value="103" ${k.kode == 103 ? "selected" : ""}>103</option>
+      </select></td>
       <td><strong>${akunMap[k.kode]}</strong></td>
       <td><textarea rows="1" ${dis} onchange="kasData[${i}].ket=this.value">${
             k.ket || ""
@@ -340,6 +339,21 @@
         saldoTotal.innerText =
           "Rp " +
           (saldo[101] + saldo[102] + saldo[103]).toLocaleString("id-ID");
+      }
+
+      function printBulanan() {
+        window.print();
+      }
+      function printTahunan() {
+        window.print();
+      }
+      function lockBulan() {
+        if (!canEdit()) return alert("Tidak punya akses");
+        const m = prompt("Kunci bulan (YYYY-MM)");
+        if (!m) return;
+        lockedMonths[m] = true;
+        db.ref("lockedMonths").set(lockedMonths);
+        alert("Bulan " + m + " dikunci");
       }
     </script>
   </body>
