@@ -3,28 +3,103 @@
   <head>
     <meta charset="UTF-8" />
     <title>Laporan Kas – Arisan Semeton Graha Tirta</title>
+
+    <!-- 🔥 FIREBASE SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
     <style>
-      body{font-family:Arial;background:#f4f6f8;padding:20px}
-      header{display:flex;align-items:center;gap:15px;background:#0f172a;color:#fff;padding:15px;border-radius:10px}
-      header img{height:60px}
-      header h1{margin:0;font-size:22px}
-      .menu{margin-left:auto}
-      .menu button{margin-left:5px}
-      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin:20px 0}
-      .grid div{background:#fff;padding:15px;border-radius:10px;text-align:center}
-      table{width:100%;border-collapse:collapse;background:#fff}
-      th,td{border:1px solid #000;padding:6px;font-size:13px;text-align:center}
-      th{background:#e5e7eb}
-      button{padding:6px 10px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer}
-      .danger{background:#dc2626}
-      @media print{
-        header,.menu,.no-print{display:none !important}
-        body{background:#fff}
-        .ttd-area{display:flex !important}
-      }body{background:#fff}.ttd-area{display:flex}}
+      body {
+        font-family: Arial;
+        background: #f4f6f8;
+        padding: 20px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        background: #0f172a;
+        color: #fff;
+        padding: 15px;
+        border-radius: 10px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .menu {
+        margin-left: auto;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin: 20px 0;
+      }
+      .grid div {
+        background: #fff;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #000;
+        padding: 6px;
+        font-size: 13px;
+        text-align: center;
+      }
+      th {
+        background: #e5e7eb;
+      }
+      input,
+      select {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      button {
+        padding: 6px 10px;
+        border: none;
+        border-radius: 6px;
+        background: #2563eb;
+        color: #fff;
+        cursor: pointer;
+      }
+      .danger {
+        background: #dc2626;
+      }
+      @media print {
+        header,
+        .menu,
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background: #fff;
+        }
+        .print-header {
+          display: flex !important;
+        }
+      }
     </style>
   </head>
   <body>
+    <div
+      class="print-header"
+      style="display: none; align-items: center; gap: 15px; margin-bottom: 20px"
+    >
+      <img src="logo.png" style="height: 70px" />
+      <div>
+        <h2>ARISAN SEMETON GRAHA TIRTA</h2>
+        <small>Laporan Kas Masuk & Keluar</small>
+      </div>
+    </div>
+
     <!-- LOGIN -->
     <div
       id="loginBox"
@@ -60,18 +135,26 @@
     </div>
 
     <header>
-      <img src="./img/logo.png" alt="Logo" />
-      <div>
-        <h1>ARISAN SEMETON GRAHA TIRTA</h1>
-        <small>Laporan Kas Masuk & Keluar</small>
+      <div style="display: flex; align-items: center; gap: 15px">
+        <img src="logo.png" style="height: 60px" />
+        <div>
+          <h1>ARISAN SEMETON GRAHA TIRTA</h1>
+          <small>Laporan Kas Masuk & Keluar</small>
+        </div>
       </div>
       <div class="menu no-print">
         <span id="userInfo"></span>
+        <button
+          id="adminMenuBtn"
+          style="display: none"
+          onclick="showAdminMenu()"
+        >
+          Data Anggota
+        </button>
         <button onclick="logout()">Logout</button>
       </div>
     </header>
 
-    <!-- DASHBOARD -->
     <div class="grid">
       <div>
         <h3>Kas Arisan</h3>
@@ -91,14 +174,6 @@
       </div>
     </div>
 
-    <div class="no-print">
-      <button onclick="tutupBulan()">🔒 Tutup Bulan</button>
-      <select id="filterBulan" onchange="renderKas()"></select>
-      <button onclick="exportPDF()">📄 Export PDF Bulan</button>
-      <button onclick="backupData()">💾 Backup</button>
-      <input type="file" onchange="restoreData(event)" />
-    </div>
-
     <table>
       <thead>
         <tr>
@@ -109,47 +184,48 @@
           <th>Debet</th>
           <th>Kredit</th>
           <th>Saldo</th>
-          <th class="no-print">Aksi</th>
         </tr>
       </thead>
       <tbody id="kasBody"></tbody>
     </table>
     <br />
+
+    <div
+      id="adminMenu"
+      class="no-print"
+      style="
+        display: none;
+        background: #fff;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 20px;
+      "
+    >
+      <h3>Data Anggota & Nominal Suka Duka</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Nama Anggota</th>
+            <th>Nominal</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="anggotaBody"></tbody>
+      </table>
+      <br />
+      <button onclick="tambahAnggota()">Tambah Anggota</button>
+    </div>
+
     <button class="no-print" onclick="tambahKas()">Tambah</button>
     <button onclick="window.print()">🖨️ Print</button>
 
-    <!-- TTD -->
-    <div
-      class="ttd-area"
-      style="margin-top: 40px; justify-content: space-between"
-      style="margin-top: 40px; display: none; justify-content: space-between"
-    >
-      <div style="text-align: center; width: 30%">
-        <p>Mengetahui,<br />Ketua</p>
-        <img src="ttd_ketua.png" style="height: 80px" /><br /><b
-          id="namaKetua"
-        ></b>
-      </div>
-      <div style="text-align: center; width: 30%">
-        <p>Diperiksa,<br />Bendahara</p>
-        <img src="ttd_bendahara.png" style="height: 80px" /><br /><b
-          id="namaBendahara"
-        ></b>
-      </div>
-      <div style="text-align: center; width: 30%">
-        <p>Dicetak Oleh</p>
-        <br /><br /><b id="namaCetak"></b>
-      </div>
-    </div>
-
     <script>
-      // ===== USER =====
-      let users = JSON.parse(localStorage.getItem("users")) || {
+      // ===== LOGIN =====
+      const users = {
         admin: { pass: "12345", role: "admin" },
         ketua: { pass: "12345", role: "ketua" },
         viewer: { pass: "12345", role: "viewer" },
       };
-      localStorage.setItem("users", JSON.stringify(users));
       let currentUser = JSON.parse(localStorage.getItem("currentUser"));
 
       function login() {
@@ -171,185 +247,148 @@
         location.reload();
       }
 
-      // ===== DATA =====
+      // ===== FIREBASE INIT =====
+      let db = null,
+        kasData = [],
+        anggotaData = [];
       const akunMap = { 101: "Kas Arisan", 102: "Kas Kecil", 103: "Suka Duka" };
-      let kasData = JSON.parse(localStorage.getItem("kasData")) || [];
-      let saldoAwalPerBulan =
-        JSON.parse(localStorage.getItem("saldoAwalPerBulan")) || {};
 
-      function getSaldoAwal(bulan) {
-        if (!saldoAwalPerBulan[bulan]) {
-          saldoAwalPerBulan[bulan] = { 101: 0, 102: 0, 103: 0 };
-          localStorage.setItem(
-            "saldoAwalPerBulan",
-            JSON.stringify(saldoAwalPerBulan)
-          );
+      window.addEventListener("load", () => {
+        if (typeof firebase === "undefined") {
+          alert("Firebase SDK gagal dimuat");
+          return;
         }
-        return saldoAwalPerBulan[bulan];
-      }
+        if (!firebase.apps.length) {
+          firebase.initializeApp({
+            apiKey: "ISI_API_KEY",
+            authDomain: "ISI_PROJECT.firebaseapp.com",
+            databaseURL: "https://ISI_PROJECT.firebaseio.com",
+            projectId: "ISI_PROJECT",
+            storageBucket: "ISI_PROJECT.appspot.com",
+            messagingSenderId: "ISI_SENDER_ID",
+            appId: "ISI_APP_ID",
+          });
+        }
+        db = firebase.database();
+        if (currentUser) {
+          loginBox.style.display = "none";
+          init();
+        }
+      });
 
-      function canEdit() {
-        if (!currentUser) return false;
-        const bulan = filterBulan.value;
-        // jika bulan dikunci, siapapun tidak boleh edit
-        if (bulan && localStorage.getItem("lock_" + bulan) === "1")
-          return false;
-        // ADMIN & KETUA boleh edit
-        return (
-          currentUser.role === "admin" ||
-          currentUser.role === "ketua" ||
-          currentUser.user === "admin"
-        );
+      function loadKas() {
+        if (!db) return;
+        db.ref("kasData").on("value", (s) => {
+          kasData = s.val() || [];
+          renderKas();
+        });
       }
-      function canDelete() {
-        return currentUser && currentUser.user === "admin";
+      function loadAnggota() {
+        if (!db) return;
+        db.ref("anggota").on("value", (s) => {
+          anggotaData = s.val() || [];
+          renderAnggota();
+        });
       }
 
       function renderKas() {
         kasBody.innerHTML = "";
-        let bulan = filterBulan.value || new Date().toISOString().slice(0, 7);
-        let saldoAwal = getSaldoAwal(bulan);
-        let saldo = { ...saldoAwal },
-          masuk = { 101: 0, 102: 0, 103: 0 },
-          keluar = { 101: 0, 102: 0, 103: 0 };
-
-        kasData
-          .map((k, idx) => ({ k, idx }))
-          .filter(
-            (o) =>
-              !filterBulan.value || o.k.tanggal?.startsWith(filterBulan.value)
-          )
-          .forEach(({ k, idx }) => {
-            saldo[k.kode] += k.debet - k.kredit;
-            k.saldo = saldo[k.kode];
-            kasBody.innerHTML += `<tr>
-<td>${
-              canEdit()
-                ? `<input type=date value="${k.tanggal}" oninput="ubahKas(${idx},'tanggal',this.value)">`
-                : k.tanggal
-            }</td>
-<td>${
-              canEdit()
-                ? `<select onchange="pilihAkun(${idx},this.value)"><option value=101 ${
-                    k.kode == 101 ? "selected" : ""
-                  }>101</option><option value=102 ${
-                    k.kode == 102 ? "selected" : ""
-                  }>102</option><option value=103 ${
-                    k.kode == 103 ? "selected" : ""
-                  }>103</option></select>`
-                : k.kode
-            }</td>
-<td>${k.nama}</td>
-<td>${
-              canEdit()
-                ? `<input value="${k.ket}" oninput="ubahKas(${idx},'ket',this.value)">`
-                : k.ket
-            }</td>
-<td>${
-              canEdit()
-                ? `<input type=number value="${k.debet}" oninput="ubahKas(${idx},'debet',this.value)">`
-                : k.debet
-            }</td>
-<td>${
-              canEdit()
-                ? `<input type=number value="${k.kredit}" oninput="ubahKas(${idx},'kredit',this.value)">`
-                : k.kredit
-            }</td>
-<td>${k.saldo.toLocaleString("id-ID")}</td>
-<td class=no-print>${
-              canDelete()
-                ? `<button class=danger onclick="hapusKas(${idx})">Hapus</button>`
-                : ""
-            }</td>
-</tr>`;
-          });
-
-        let total = 0;
-        [101, 102, 103].forEach((k) => {
-          total += saldo[k];
-          document.getElementById("saldo" + k).innerText =
-            "Rp " + saldo[k].toLocaleString("id-ID");
+        let saldo = { 101: 0, 102: 0, 103: 0 };
+        kasData.forEach((k, i) => {
+          saldo[k.kode] += k.debet - k.kredit;
+          kasBody.innerHTML += `<tr>
+      <td><input type="date" value="${
+        k.tanggal
+      }" oninput="ubahDebounce(${i},'tanggal',this.value)"></td>
+      <td><select oninput="ubahDebounce(${i},'kode',this.value)">
+        <option value="101" ${k.kode == 101 ? "selected" : ""}>101</option>
+        <option value="102" ${k.kode == 102 ? "selected" : ""}>102</option>
+        <option value="103" ${k.kode == 103 ? "selected" : ""}>103</option>
+      </select></td>
+      <td>${akunMap[k.kode]}</td>
+      <td><input value="${
+        k.ket || ""
+      }" oninput="ubahDebounce(${i},'ket',this.value)"></td>
+      <td><input type="number" value="${
+        k.debet
+      }" oninput="ubahDebounce(${i},'debet',this.value)"></td>
+      <td><input type="number" value="${
+        k.kredit
+      }" oninput="ubahDebounce(${i},'kredit',this.value)"></td>
+      <td>${saldo[k.kode].toLocaleString("id-ID")}</td>
+    </tr>`;
         });
-        saldoTotal.innerText = "Rp " + total.toLocaleString("id-ID");
-        localStorage.setItem("kasData", JSON.stringify(kasData));
+        saldo101.innerText = "Rp " + saldo[101].toLocaleString("id-ID");
+        saldo102.innerText = "Rp " + saldo[102].toLocaleString("id-ID");
+        saldo103.innerText = "Rp " + saldo[103].toLocaleString("id-ID");
+        saldoTotal.innerText =
+          "Rp " +
+          (saldo[101] + saldo[102] + saldo[103]).toLocaleString("id-ID");
+      }
+
+      let typingTimer = {};
+      function ubahDebounce(i, f, v) {
+        clearTimeout(typingTimer[i + f]);
+        typingTimer[i + f] = setTimeout(() => ubah(i, f, v), 300);
+      }
+      function ubah(i, f, v) {
+        kasData[i][f] =
+          f === "debet" || f === "kredit" || f === "kode" ? Number(v) : v;
+        db.ref("kasData").set(kasData);
       }
 
       function tambahKas() {
         kasData.push({
           tanggal: new Date().toISOString().slice(0, 10),
           kode: 101,
-          nama: "Kas Arisan",
           ket: "",
           debet: 0,
           kredit: 0,
-          saldo: 0,
         });
-        renderKas();
-      }
-      function pilihAkun(i, k) {
-        kasData[i].kode = Number(k);
-        kasData[i].nama = akunMap[k];
-        renderKas();
-      }
-      function ubahKas(i, f, v) {
-        kasData[i][f] = f === "debet" || f === "kredit" ? Number(v) : v;
-        renderKas();
-      }
-      function hapusKas(i) {
-        if (confirm("Hapus?")) {
-          kasData.splice(i, 1);
-          renderKas();
-        }
+        db.ref("kasData").set(kasData);
       }
 
-      function tutupBulan() {
-        let b = filterBulan.value || new Date().toISOString().slice(0, 7);
-        localStorage.setItem("lock_" + b, "1");
-        alert("Bulan dikunci");
+      function renderAnggota() {
+        anggotaBody.innerHTML = "";
+        anggotaData.forEach((a, i) => {
+          anggotaBody.innerHTML += `<tr>
+      <td><input value="${
+        a.nama || ""
+      }" oninput="ubahAnggota(${i},'nama',this.value)"></td>
+      <td><input type="number" value="${
+        a.nominal || 0
+      }" oninput="ubahAnggota(${i},'nominal',this.value)"></td>
+      <td><button class="danger" onclick="hapusAnggota(${i})">Hapus</button></td>
+    </tr>`;
+        });
       }
-      function exportPDF() {
-        window.print();
+      function ubahAnggota(i, f, v) {
+        anggotaData[i][f] = f === "nominal" ? Number(v) : v;
+        db.ref("anggota").set(anggotaData);
       }
-      function backupData() {
-        let a = document.createElement("a");
-        a.href = URL.createObjectURL(
-          new Blob([JSON.stringify({ kasData, users })])
-        );
-        a.download = "backup.json";
-        a.click();
+      function tambahAnggota() {
+        anggotaData.push({ nama: "", nominal: 0 });
+        db.ref("anggota").set(anggotaData);
       }
-      function restoreData(e) {
-        let r = new FileReader();
-        r.onload = () => {
-          let d = JSON.parse(r.result);
-          kasData = d.kasData || [];
-          users = d.users || users;
-          renderKas();
-        };
-        r.readAsText(e.target.files[0]);
+      function hapusAnggota(i) {
+        if (confirm("Hapus anggota?")) {
+          anggotaData.splice(i, 1);
+          db.ref("anggota").set(anggotaData);
+        }
+      }
+      function showAdminMenu() {
+        adminMenu.style.display =
+          adminMenu.style.display === "none" ? "block" : "none";
       }
 
       function init() {
         userInfo.innerText = currentUser.user + " (" + currentUser.role + ")";
-        namaCetak.innerText = currentUser.user;
-        namaKetua.innerText = "PUTU YOGI ANDRIAS";
-        namaBendahara.innerText = "KETUT AGUS SINARTA";
-        renderKas();
+        if (currentUser.role === "admin") {
+          adminMenuBtn.style.display = "inline-block";
+          loadAnggota();
+        }
+        loadKas();
       }
-
-      if (currentUser) {
-        loginBox.style.display = "none";
-        init();
-      }
-
-      // filter bulan
-      (function () {
-        let s = new Set();
-        kasData.forEach((k) => s.add(k.tanggal.slice(0, 7)));
-        filterBulan.innerHTML =
-          '<option value="">Semua Bulan</option>' +
-          [...s].map((b) => `<option>${b}</option>`).join("");
-      })();
     </script>
   </body>
 </html>
