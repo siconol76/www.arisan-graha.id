@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Laporan Kas – Arisan Semeton Graha Tirta</title>
 
-    <!-- 🔥 FIREBASE SDK v8 -->
+    <!-- Firebase v8 -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
@@ -58,9 +58,13 @@
         background: #e5e7eb;
       }
       input,
-      select {
+      textarea {
         width: 100%;
         box-sizing: border-box;
+        font-size: 13px;
+      }
+      textarea {
+        resize: vertical;
       }
       button {
         padding: 6px 10px;
@@ -73,33 +77,26 @@
       .danger {
         background: #dc2626;
       }
+      .no-print {
+      }
+      .print-header,
+      .ttd-area {
+        display: none;
+      }
       @media print {
         header,
         .menu,
         .no-print {
           display: none !important;
         }
-        body {
-          background: #fff;
-        }
-        .print-header {
+        .print-header,
+        .ttd-area {
           display: flex !important;
         }
       }
     </style>
   </head>
   <body>
-    <div
-      class="print-header"
-      style="display: none; align-items: center; gap: 15px; margin-bottom: 20px"
-    >
-      <img src="logo.png" style="height: 70px" />
-      <div>
-        <h2>ARISAN SEMETON GRAHA TIRTA</h2>
-        <small>Laporan Kas Masuk & Keluar</small>
-      </div>
-    </div>
-
     <!-- LOGIN -->
     <div
       id="loginBox"
@@ -129,7 +126,7 @@
           type="password"
           placeholder="Password"
         /><br /><br />
-        <button onclick="login()">Login</button>
+        <button id="btnLogin">Login</button>
         <p id="loginErr" style="color: red"></p>
       </div>
     </div>
@@ -144,14 +141,8 @@
       </div>
       <div class="menu no-print">
         <span id="userInfo"></span>
-        <button
-          id="adminMenuBtn"
-          style="display: none"
-          onclick="showAdminMenu()"
-        >
-          Data Anggota
-        </button>
-        <button onclick="logout()">Logout</button>
+        <button id="adminMenuBtn" style="display: none">Data Anggota</button>
+        <button id="btnLogout">Logout</button>
       </div>
     </header>
 
@@ -168,7 +159,7 @@
         <h3>Kas Kecil</h3>
         <div id="saldo102">Rp 0</div>
       </div>
-      <div style="background: #e0f2fe">
+      <div>
         <h3>Total</h3>
         <div id="saldoTotal">Rp 0</div>
       </div>
@@ -190,8 +181,34 @@
     </table>
     <br />
 
+    <!-- REKAP -->
     <div
-      id="adminMenu"
+      class="no-print"
+      style="
+        background: #fff;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+      "
+    >
+      <h3>Rekap</h3>
+      <label>Bulan: <input type="month" id="rekapBulan" /></label>
+      <label style="margin-left: 10px"
+        >Tahun: <input type="number" id="rekapTahun" style="width: 90px"
+      /></label>
+      <button onclick="hitungRekap()">Lihat Rekap</button>
+      <div id="hasilRekap" style="margin-top: 10px"></div>
+    </div>
+
+    <div class="no-print">
+      <button id="btnTambah">➕ Tambah</button>
+      <button id="btnSave" style="display: none">💾 Simpan Semua</button>
+      <button id="btnPrint">🖨️ Export PDF</button>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <div
+      id="adminPanel"
       class="no-print"
       style="
         display: none;
@@ -201,11 +218,12 @@
         margin-top: 20px;
       "
     >
-      <h3>Data Anggota & Nominal Suka Duka</h3>
+      <h3>Daftar Anggota & Nominal Suka Duka</h3>
       <table>
         <thead>
           <tr>
-            <th>Nama Anggota</th>
+            <th>No</th>
+            <th>Nama</th>
             <th>Nominal</th>
             <th>Aksi</th>
           </tr>
@@ -213,82 +231,104 @@
         <tbody id="anggotaBody"></tbody>
       </table>
       <br />
-      <button onclick="tambahAnggota()">Tambah Anggota</button>
+      <button id="btnTambahAnggota">➕ Tambah</button>
+      <button id="btnSimpanAnggota">💾 Simpan</button>
     </div>
 
-    <button class="no-print" onclick="tambahKas()">Tambah</button>
-    <button onclick="window.print()">🖨️ Print</button>
-
     <script>
-      // ===== LOGIN =====
+      // ===== AUTH =====
       const users = {
         admin: { pass: "12345", role: "admin" },
         ketua: { pass: "12345", role: "ketua" },
         viewer: { pass: "12345", role: "viewer" },
       };
-      let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+      let currentUser = null;
+
+      function canEdit() {
+        return (
+          currentUser &&
+          (currentUser.role === "admin" || currentUser.role === "ketua")
+        );
+      }
 
       function login() {
-        if (
-          users[loginUser.value] &&
-          users[loginUser.value].pass === loginPass.value
-        ) {
-          currentUser = {
-            user: loginUser.value,
-            role: users[loginUser.value].role,
-          };
+        const u = loginUser.value;
+        const p = loginPass.value;
+        if (users[u] && users[u].pass === p) {
+          currentUser = { user: u, role: users[u].role };
           localStorage.setItem("currentUser", JSON.stringify(currentUser));
           loginBox.style.display = "none";
           init();
         } else loginErr.innerText = "Login salah";
       }
+
       function logout() {
         localStorage.removeItem("currentUser");
         location.reload();
       }
 
-      // ===== FIREBASE INIT =====
-      let db = null,
-        kasData = [],
-        anggotaData = [];
+      // ===== FIREBASE =====
+      let db = null;
+      let kasData = [];
+      let anggotaData = [];
       const akunMap = { 101: "Kas Arisan", 102: "Kas Kecil", 103: "Suka Duka" };
 
       window.addEventListener("load", () => {
-        if (typeof firebase === "undefined") {
-          alert("Firebase SDK gagal dimuat");
-          return;
-        }
-        if (!firebase.apps.length) {
-          firebase.initializeApp({
-            apiKey: "ISI_API_KEY",
-            authDomain: "ISI_PROJECT.firebaseapp.com",
-            databaseURL: "https://ISI_PROJECT.firebaseio.com",
-            projectId: "ISI_PROJECT",
-            storageBucket: "ISI_PROJECT.appspot.com",
-            messagingSenderId: "ISI_SENDER_ID",
-            appId: "ISI_APP_ID",
-          });
-        }
+        firebase.initializeApp({
+          apiKey: "ISI_API_KEY",
+          databaseURL: "https://ISI_PROJECT.firebaseio.com",
+        });
         db = firebase.database();
-        if (currentUser) {
+        btnLogin.onclick = login;
+        btnLogout.onclick = logout;
+        btnTambah.onclick = tambahKas;
+        btnSave.onclick = simpanSemua;
+        btnPrint.onclick = () => window.print();
+        btnTambahAnggota.onclick = tambahAnggota;
+        btnSimpanAnggota.onclick = simpanAnggota;
+        adminMenuBtn.onclick = () =>
+          (adminPanel.style.display =
+            adminPanel.style.display === "none" ? "block" : "none");
+
+        const saved = localStorage.getItem("currentUser");
+        if (saved) {
+          currentUser = JSON.parse(saved);
           loginBox.style.display = "none";
           init();
         }
       });
 
-      function loadKas() {
-        if (!db) return;
+      function init() {
+        userInfo.innerText = currentUser.user + " (" + currentUser.role + ")";
+        if (canEdit()) btnSave.style.display = "inline-block";
+        if (currentUser.role === "admin") {
+          adminMenuBtn.style.display = "inline-block";
+          loadAnggota();
+        }
         db.ref("kasData").on("value", (s) => {
           kasData = s.val() || [];
           renderKas();
         });
       }
-      function loadAnggota() {
-        if (!db) return;
-        db.ref("anggota").on("value", (s) => {
-          anggotaData = s.val() || [];
-          renderAnggota();
+
+      // ===== KAS =====
+      function tambahKas() {
+        if (!canEdit()) return;
+        kasData.push({
+          tanggal: new Date().toISOString().slice(0, 10),
+          kode: 101,
+          ket: "",
+          debet: 0,
+          kredit: 0,
         });
+        renderKas();
+      }
+
+      function simpanSemua() {
+        if (!canEdit()) return;
+        db.ref("kasData")
+          .set(kasData)
+          .then(() => alert("Tersimpan"));
       }
 
       function renderKas() {
@@ -296,25 +336,22 @@
         let saldo = { 101: 0, 102: 0, 103: 0 };
         kasData.forEach((k, i) => {
           saldo[k.kode] += k.debet - k.kredit;
+          const dis = canEdit() ? "" : "disabled";
           kasBody.innerHTML += `<tr>
-      <td><input type="date" value="${
-        k.tanggal
-      }" oninput="ubahDebounce(${i},'tanggal',this.value)"></td>
-      <td><select oninput="ubahDebounce(${i},'kode',this.value)">
-        <option value="101" ${k.kode == 101 ? "selected" : ""}>101</option>
-        <option value="102" ${k.kode == 102 ? "selected" : ""}>102</option>
-        <option value="103" ${k.kode == 103 ? "selected" : ""}>103</option>
-      </select></td>
+      <td><input type="date" ${dis} value="${
+            k.tanggal
+          }" onchange="kasData[${i}].tanggal=this.value"></td>
+      <td>${k.kode}</td>
       <td>${akunMap[k.kode]}</td>
-      <td><input value="${
-        k.ket || ""
-      }" oninput="ubahDebounce(${i},'ket',this.value)"></td>
-      <td><input type="number" value="${
-        k.debet
-      }" oninput="ubahDebounce(${i},'debet',this.value)"></td>
-      <td><input type="number" value="${
-        k.kredit
-      }" oninput="ubahDebounce(${i},'kredit',this.value)"></td>
+      <td><textarea rows="1" ${dis} onchange="kasData[${i}].ket=this.value">${
+            k.ket || ""
+          }</textarea></td>
+      <td><input type="number" ${dis} value="${
+            k.debet
+          }" onchange="kasData[${i}].debet=Number(this.value)"></td>
+      <td><input type="number" ${dis} value="${
+            k.kredit
+          }" onchange="kasData[${i}].kredit=Number(this.value)"></td>
       <td>${saldo[k.kode].toLocaleString("id-ID")}</td>
     </tr>`;
         });
@@ -326,69 +363,102 @@
           (saldo[101] + saldo[102] + saldo[103]).toLocaleString("id-ID");
       }
 
-      let typingTimer = {};
-      function ubahDebounce(i, f, v) {
-        clearTimeout(typingTimer[i + f]);
-        typingTimer[i + f] = setTimeout(() => ubah(i, f, v), 300);
-      }
-      function ubah(i, f, v) {
-        kasData[i][f] =
-          f === "debet" || f === "kredit" || f === "kode" ? Number(v) : v;
-        db.ref("kasData").set(kasData);
-      }
-
-      function tambahKas() {
-        kasData.push({
-          tanggal: new Date().toISOString().slice(0, 10),
-          kode: 101,
-          ket: "",
-          debet: 0,
-          kredit: 0,
+      // ===== ANGGOTA =====
+      function loadAnggota() {
+        db.ref("anggota").once("value", (s) => {
+          anggotaData = s.val() || [];
+          renderAnggota();
         });
-        db.ref("kasData").set(kasData);
       }
-
       function renderAnggota() {
         anggotaBody.innerHTML = "";
         anggotaData.forEach((a, i) => {
-          anggotaBody.innerHTML += `<tr>
-      <td><input value="${
-        a.nama || ""
-      }" oninput="ubahAnggota(${i},'nama',this.value)"></td>
-      <td><input type="number" value="${
-        a.nominal || 0
-      }" oninput="ubahAnggota(${i},'nominal',this.value)"></td>
-      <td><button class="danger" onclick="hapusAnggota(${i})">Hapus</button></td>
-    </tr>`;
+          anggotaBody.innerHTML += `<tr><td>${i + 1}</td><td><input value="${
+            a.nama || ""
+          }" onchange="anggotaData[${i}].nama=this.value"></td><td><input type="number" value="${
+            a.nominal || 0
+          }" onchange="anggotaData[${i}].nominal=Number(this.value)"></td><td><button class="danger" onclick="hapusAnggota(${i})">Hapus</button></td></tr>`;
         });
-      }
-      function ubahAnggota(i, f, v) {
-        anggotaData[i][f] = f === "nominal" ? Number(v) : v;
-        db.ref("anggota").set(anggotaData);
       }
       function tambahAnggota() {
         anggotaData.push({ nama: "", nominal: 0 });
-        db.ref("anggota").set(anggotaData);
+        renderAnggota();
       }
       function hapusAnggota(i) {
-        if (confirm("Hapus anggota?")) {
+        if (confirm("Hapus?")) {
           anggotaData.splice(i, 1);
-          db.ref("anggota").set(anggotaData);
+          renderAnggota();
         }
       }
-      function showAdminMenu() {
-        adminMenu.style.display =
-          adminMenu.style.display === "none" ? "block" : "none";
+      function simpanAnggota() {
+        db.ref("anggota")
+          .set(anggotaData)
+          .then(() => alert("Anggota tersimpan"));
+      }
+    </script>
+    <!-- PRINT HEADER -->
+    <div
+      class="print-header"
+      style="align-items: center; gap: 15px; margin-top: 40px"
+    >
+      <img src="logo.png" style="height: 70px" />
+      <div>
+        <h2>ARISAN SEMETON GRAHA TIRTA</h2>
+        <small>Laporan Kas</small>
+      </div>
+    </div>
+
+    <!-- TTD DIGITAL -->
+    <div
+      class="ttd-area"
+      style="justify-content: space-between; margin-top: 60px"
+    >
+      <div style="text-align: center">
+        <div>Ketua</div>
+        <br />
+        <img id="ttdKetuaImg" style="height: 80px" /><br />
+        <strong id="ttdKetuaText"></strong>
+      </div>
+      <div style="text-align: center">
+        <div>Bendahara</div>
+        <br />
+        <img id="ttdBendaharaImg" style="height: 80px" /><br />
+        <strong id="ttdBendaharaText"></strong>
+      </div>
+    </div>
+
+    <script>
+      // ===== REKAP =====
+      function hitungRekap() {
+        const b = rekapBulan.value;
+        const t = rekapTahun.value;
+        let total = 0;
+        kasData.forEach((k) => {
+          const d = new Date(k.tanggal);
+          if (b) {
+            const [y, m] = b.split("-");
+            if (d.getFullYear() != y || d.getMonth() + 1 != m) return;
+          }
+          if (t && d.getFullYear() != t) return;
+          total += k.debet - k.kredit;
+        });
+        hasilRekap.innerHTML =
+          "Total: <strong>Rp " + total.toLocaleString("id-ID") + "</strong>";
       }
 
-      function init() {
-        userInfo.innerText = currentUser.user + " (" + currentUser.role + ")";
-        if (currentUser.role === "admin") {
-          adminMenuBtn.style.display = "inline-block";
-          loadAnggota();
-        }
-        loadKas();
-      }
+      // ===== LOAD TTD =====
+      db &&
+        db.ref("ttd").on("value", (s) => {
+          const d = s.val() || {};
+          if (d.ketua) {
+            ttdKetuaImg.src = d.ketua.img;
+            ttdKetuaText.innerText = d.ketua.nama;
+          }
+          if (d.bendahara) {
+            ttdBendaharaImg.src = d.bendahara.img;
+            ttdBendaharaText.innerText = d.bendahara.nama;
+          }
+        });
     </script>
   </body>
 </html>
